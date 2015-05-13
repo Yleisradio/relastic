@@ -11,14 +11,12 @@
 (defn- write-alias [index]
   (str index "_write"))
 
-(defn- trace [x]
-  (clojure.pprint/pprint x)
-  x)
-
 (defn- copy-documents [conn index old-index new-index]
   ; direct write operations to the new index
   (esi/update-aliases conn [{:add    {:index new-index :alias (write-alias index)}}
                             {:remove {:index old-index :aliases (write-alias index)}}])
+
+  (esi/refresh conn old-index)
 
   (doseq [{:keys [_type _source _id]} (esd/scroll-seq conn (esd/search-all-types conn old-index
                                                                                  :query (q/match-all)
@@ -28,11 +26,13 @@
 
     (esd/create conn new-index _type _source :id _id))
 
+  (esi/refresh conn new-index)
+
   ; now we can direct also read operations to new index
   (esi/update-aliases conn [{:add    {:index new-index :alias   (read-alias index)}}
                             {:remove {:index old-index :aliases (read-alias index)}}]))
 
-(defn update-mapping [conn index version mappings settings]
+(defn update-mappings [conn index version mappings settings]
   (let [index-name (str index "_v" version)
         old-index (str index "_v" (dec version))]
     (when-not (esi/exists? conn index-name)
