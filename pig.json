@@ -1,0 +1,8 @@
+{
+    "elasticsearch":{
+        "name":"relastic-elasticsearch",
+        "daemon":true,
+        "image":"yleisradio/elasticsearch-dev:1.5.2",
+        "ports":["9200:9200", "9300:9300"]
+    }
+}
