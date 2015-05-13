@@ -3,7 +3,8 @@
             [clojurewerkz.elastisch.native.document :as esd]
             [clojurewerkz.elastisch.native.bulk :as esb]
             [clojurewerkz.elastisch.query :as q]
-            [clojurewerkz.elastisch.native :as elastisch])
+            [clojurewerkz.elastisch.native :as elastisch]
+            [cheshire.core :as json])
   (:gen-class))
 
 (defn- read-alias [index]
@@ -72,9 +73,63 @@
         (migrate conn index old-index new-index)
         (writes-and-reads->new-index conn index new-index)))))
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))
+(defn- throw-validation-error [message]
+  (throw (ex-info message {:type :validation-error})))
 
+(defn- int-or-error [s error]
+  (try
+    (Integer/parseInt s)
+    (catch NumberFormatException _
+      (throw-validation-error error))))
+
+(defn- slurp-json-or-error [file error]
+  (try
+    (json/parse-string (slurp file))
+    (catch Exception _
+      (throw-validation-error error))))
+
+(defn- args->option [[name value]]
+  (condp = name
+    "--host" [:host value]
+    "--port" [:port (int-or-error value "Option --port value must be numeric")]
+    "--index" [:index value]
+    "--version" [:version (int-or-error value "Option --version value must be numeric")]
+    "--mappings" [:mappings (slurp-json-or-error value "Option --mappings expects a file name containing valid json")] 
+    "--settings" [:settings (slurp-json-or-error value "Option --settings expects a file name containing valid json")]
+    (throw (IllegalArgumentException. (str "Invalid option '" name "'")))))
+
+(defn- parse-options [args]
+  (let [defaults {:mappings nil
+                  :port 9300
+                  :host "localhost"}]
+    (merge defaults (into {} (map args->option (partition-all 2 args))))))
+
+
+(defn- validate-options [{:keys [index version mappings] :as options}]
+  (when-not index
+    (throw-validation-error "Required option --index missing"))
+  (when-not version
+    (throw-validation-error "Required option --version missing"))
+  (when-not mappings
+    (throw-validation-error "Required option --mappings missing"))
+  options)
+
+(defn- print-usage []
+  (println "Usage: java -jar relastic-standalone.jar OPTIONS")
+  (println "Supported options:")
+  (println "--index       REQUIRED The index to update mappings for")
+  (println "--version     REQUIRED Newest mapping version number")
+  (println "--mappings    REQUIRED File that contains all index mappings as JSON")
+  (println "--settings    OPTIONAL File that contains all index settings as JSON")
+  (println "--host        OPTIONAL Host to connect (defaults to localhost)")
+  (println "--port        OPTIONAL Port to connect (defaults to 9300)"))
+
+(defn -main [& args]
+  (try
+    (let [{:keys [host port index version mappings settings]} (validate-options (parse-options args))]
+      (update-mappings (elastisch/connect [[host port]]) index version mappings settings))
+    (catch clojure.lang.ExceptionInfo ex
+      (println (.getMessage ex))
+      (println "")
+      (print-usage))))
 
