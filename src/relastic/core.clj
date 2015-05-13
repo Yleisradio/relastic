@@ -1,6 +1,7 @@
 (ns relastic.core
   (:require [clojurewerkz.elastisch.native.index :as esi]
             [clojurewerkz.elastisch.native.document :as esd]
+            [clojurewerkz.elastisch.native.bulk :as esb]
             [clojurewerkz.elastisch.query :as q]
             [clojurewerkz.elastisch.native :as elastisch])
   (:gen-class))
@@ -18,9 +19,17 @@
                         :scroll "1m"
                         :size 500))
 
+(defn- document->bulk-index-op [to-index {:keys [_type _id _source]}]
+  [{"index" {:_index to-index
+             :_type _type
+             :_id _id}}
+   _source])
+
 (defn- copy-documents [conn old-index new-index]
-  (doseq [{:keys [_type _source _id]} (esd/scroll-seq conn (start-scroll conn old-index))]
-    (esd/create conn new-index _type _source :id _id)))
+  (let [bulk-ops (->> (esd/scroll-seq conn (start-scroll conn old-index))
+                      (map #(document->bulk-index-op new-index %))
+                      (flatten))]
+    (esb/bulk conn bulk-ops)))
 
 (defn- writes->new-index [conn index old-index new-index]
   (esi/update-aliases conn [{:add  {:index new-index :alias (write-alias index)}}
