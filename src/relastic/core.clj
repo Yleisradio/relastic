@@ -26,7 +26,7 @@
                                                                                  :scroll "1m"
                                                                                  :size 500))]
 
-    (esd/create conn new-index _type _source :id _id))
+    (esd/create conn new-index _type (map-fn _source) :id _id))
 
   ; now we can direct also read operations to new index
   (esi/update-aliases conn [{:add    {:index new-index :alias   (read-alias index)}}
@@ -39,10 +39,9 @@
       (println "Index not found, creating...")
       (esi/create conn index-name :mappings mappings :settings settings)
       (if (esi/exists? conn old-index)
-        (copy-documents conn index old-index index-name map-fn)
+        (copy-documents conn index old-index index-name (or map-fn identity))
         (esi/update-aliases conn [{:add {:index index-name :alias (read-alias index)}}
                                   {:add {:index index-name :alias (write-alias index)}}])))))
-
 
 (defn -main
   "I don't do a whole lot ... yet."
