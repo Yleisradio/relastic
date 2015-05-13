@@ -30,12 +30,23 @@
   (esi/update-aliases conn [{:add    {:index new-index :alias   (read-alias index)}}
                             {:remove {:index old-index :aliases (read-alias index)}}]))
 
+(defn- get-refresh-interval [conn index-name]
+  (get-in (esi/get-settings conn index-name)
+          [(keyword index-name) :settings :index :refresh_interval]
+          "1s"))
+
+(defn- set-refresh-interval [conn index-name refresh-interval]
+  (esi/update-settings conn index-name {:index {:refresh_interval refresh-interval}}))
+
 (defn- migrate [conn index old-index new-index]
-  (writes->new-index conn index old-index new-index) 
-  (esi/refresh conn old-index)
-  (copy-documents conn old-index new-index) 
-  (esi/refresh conn new-index)
-  (reads->new-index conn index old-index new-index))
+  (let [refresh-interval (get-refresh-interval conn new-index)]
+    (set-refresh-interval conn new-index -1) ; disable refresh interval during migration 
+    (writes->new-index conn index old-index new-index) 
+    (esi/refresh conn old-index)
+    (copy-documents conn old-index new-index) 
+    (esi/refresh conn new-index)
+    (set-refresh-interval conn new-index refresh-interval) 
+    (reads->new-index conn index old-index new-index)))
 
 (defn- writes-and-reads->new-index [conn index new-index]
   (esi/update-aliases conn [{:add {:index new-index :alias (read-alias index)}}

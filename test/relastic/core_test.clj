@@ -9,12 +9,10 @@
             [clojurewerkz.elastisch.rest.index :as eri]))
 
 (def ^:private conn (elastisch/connect "http://dockerhost:9200"))
-
 (def ^:private native-conn (elastisch-native/connect [["dockerhost" 9300]]))
-
 (def ^:private mapping-v1 {:tweet {:properties {:content {:type "string"}}}})
-
 (def ^:private mapping-v2 (assoc-in mapping-v1 [:tweet :properties :user] {:type "string" :index "not_analyzed"}))
+(def ^:private settings {"index" {"refresh_interval" "20s"}})
 
 (defn- cleanup-db []
   (esi/delete conn "relastic_test_v*"))
@@ -26,7 +24,7 @@
 (use-fixtures :each with-clean-slate)
 
 (deftest when-old-index-does-not-exist-creates-a-new-index-with-mappings
-  (relastic/update-mappings native-conn "relastic_test" 1 mapping-v1 nil)
+  (relastic/update-mappings native-conn "relastic_test" 1 mapping-v1 settings)
 
   (testing "creates relastic_test_v1 index"
     (is (true? (esi/exists? conn "relastic_test_v1"))))
@@ -35,10 +33,10 @@
     (is (= (eri/get-aliases conn "relastic_test_v1") {:relastic_test_v1 {:aliases {:relastic_test_write {}
                                                                                    :relastic_test_read {}}}}))))
 (deftest when-old-index-exists-copies-documents-to-new-index
-    (relastic/update-mappings native-conn "relastic_test" 1 mapping-v1 nil)
+    (relastic/update-mappings native-conn "relastic_test" 1 mapping-v1 settings)
     (esd/create conn "relastic_test_write" "tweet" {:content "foo"})
     (esd/create conn "relastic_test_write" "tweet" {:content "bar"})
-    (relastic/update-mappings native-conn "relastic_test" 2 mapping-v2 nil)
+    (relastic/update-mappings native-conn "relastic_test" 2 mapping-v2 settings)
 
     (testing "creates relastic_test_v2 index"
       (is (true? (esi/exists? conn "relastic_test_v2"))))
@@ -60,5 +58,10 @@
 
     (testing "updates mapping"
       (let [actual-mapping (eri/get-mapping conn "relastic_test_v2")]
+        (is (= actual-mapping {:relastic_test_v2 {:mappings mapping-v2 }} ))))
+    
+    (testing "updates settings"
+      (let  [actual-settings (esi/get-settings conn "relastic_test_v2")
+             refresh-interval (get-in actual-settings [:relastic_test_v2 :settings :index :refresh_interval])]
+        (is  (= refresh-interval "20s")))))
 
-        (is (= actual-mapping {:relastic_test_v2 {:mappings mapping-v2 }} )))))
