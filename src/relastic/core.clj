@@ -11,37 +11,45 @@
 (defn- write-alias [index]
   (str index "_write"))
 
-(defn- copy-documents [conn index old-index new-index]
-  ; direct write operations to the new index
-  (esi/update-aliases conn [{:add    {:index new-index :alias (write-alias index)}}
-                            {:remove {:index old-index :aliases (write-alias index)}}])
+(defn- start-scroll [conn index-name]
+  (esd/search-all-types conn index-name 
+                        :query (q/match-all)
+                        :search_type "query_then_fetch"
+                        :scroll "1m"
+                        :size 500))
 
-  (esi/refresh conn old-index)
+(defn- copy-documents [conn old-index new-index]
+  (doseq [{:keys [_type _source _id]} (esd/scroll-seq conn (start-scroll conn old-index))]
+    (esd/create conn new-index _type _source :id _id)))
 
-  (doseq [{:keys [_type _source _id]} (esd/scroll-seq conn (esd/search-all-types conn old-index
-                                                                                 :query (q/match-all)
-                                                                                 :search_type "query_then_fetch"
-                                                                                 :scroll "1m"
-                                                                                 :size 500))]
+(defn- writes->new-index [conn index old-index new-index]
+  (esi/update-aliases conn [{:add  {:index new-index :alias (write-alias index)}}
+                            {:remove {:index old-index :aliases (write-alias index)}}]))
 
-    (esd/create conn new-index _type _source :id _id))
-
-  (esi/refresh conn new-index)
-
-  ; now we can direct also read operations to new index
+(defn- reads->new-index [conn index old-index new-index]
   (esi/update-aliases conn [{:add    {:index new-index :alias   (read-alias index)}}
                             {:remove {:index old-index :aliases (read-alias index)}}]))
 
+(defn- migrate [conn index old-index new-index]
+  (writes->new-index conn index old-index new-index) 
+  (esi/refresh conn old-index)
+  (copy-documents conn old-index new-index) 
+  (esi/refresh conn new-index)
+  (reads->new-index conn index old-index new-index))
+
+(defn- writes-and-reads->new-index [conn index new-index]
+  (esi/update-aliases conn [{:add {:index new-index :alias (read-alias index)}}
+                            {:add {:index new-index :alias (write-alias index)}}]))
+
 (defn update-mappings [conn index version mappings settings]
-  (let [index-name (str index "_v" version)
+  (let [new-index (str index "_v" version)
         old-index (str index "_v" (dec version))]
-    (when-not (esi/exists? conn index-name)
+    (when-not (esi/exists? conn new-index)
       (println "Index not found, creating...")
-      (esi/create conn index-name :mappings mappings :settings settings)
+      (esi/create conn new-index :mappings mappings :settings settings)
       (if (esi/exists? conn old-index)
-        (copy-documents conn index old-index index-name)
-        (esi/update-aliases conn [{:add {:index index-name :alias (read-alias index)}}
-                                  {:add {:index index-name :alias (write-alias index)}}])))))
+        (migrate conn index old-index new-index)
+        (writes-and-reads->new-index conn index new-index)))))
 
 (defn -main
   "I don't do a whole lot ... yet."
