@@ -29,7 +29,8 @@
   (let [bulk-ops (->> (esd/scroll-seq conn (start-scroll conn old-index))
                       (map #(document->bulk-index-op new-index %))
                       (flatten))]
-    (esb/bulk conn bulk-ops)))
+    (when-not (empty? bulk-ops)
+      (esb/bulk conn bulk-ops))))
 
 (defn- writes->new-index [conn index old-index new-index]
   (esi/update-aliases conn [{:add  {:index new-index :alias (write-alias index)}}
