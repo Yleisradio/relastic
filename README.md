@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/Yleisradio/relastic.svg?branch=master)](https://travis-ci.org/Yleisradio/relastic)
+
 # relastic
 
 FIXME: description
