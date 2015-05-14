@@ -6,10 +6,15 @@
             [clojurewerkz.elastisch.query :as q]
             [clojurewerkz.elastisch.rest :as elastisch]
             [clojurewerkz.elastisch.native :as elastisch-native]
-            [clojurewerkz.elastisch.rest.index :as eri]))
+            [clojurewerkz.elastisch.rest.index :as eri]
+            [environ.core :refer [env]]))
 
-(def ^:private conn (elastisch/connect "http://dockerhost:9200"))
-(def ^:private native-conn (elastisch-native/connect [["dockerhost" 9300]]))
+(def ^:private cluster-name (get env :es-cluster-name "elasticsearch"))
+(def ^:private elastic-host (get env :es-host "dockerhost"))
+(def ^:private rest-port (Integer/parseInt (get env :es-rest-port "9200")))
+(def ^:private binary-port (Integer/parseInt (get env :es-binary-port "9300")))
+(def ^:private conn (elastisch/connect (str "http://" elastic-host ":" rest-port)))
+(def ^:private native-conn (elastisch-native/connect [[elastic-host binary-port]]))
 (def ^:private mapping-v1 {:tweet {:properties {:content {:type "string"}}}})
 (def ^:private mapping-v2 (assoc-in mapping-v1 [:tweet :properties :user] {:type "string" :index "not_analyzed"}))
 (def ^:private settings {"index" {"refresh_interval" "20s"}})
