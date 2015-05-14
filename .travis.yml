@@ -6,6 +6,7 @@ env:
   - ES_CLUSTER_NAME=elasticsearch ES_HOST=localhost ES_REST_PORT=9200 ES_BINARY_PORT=9300
 before_install:
   - "ulimit -u 4096"
+  - "curl -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.5.2.deb && sudo dpkg -i --force-confnew elasticsearch-1.5.2.deb"
   - "sudo service elasticsearch status"
 script: lein2 test
 jdk:
