@@ -29,33 +29,43 @@
 (use-fixtures :each with-clean-slate)
 
 (deftest when-old-index-does-not-exist-creates-a-new-index-with-mappings
-  (relastic/update-mappings native-conn "relastic_test" 1 mapping-v1 settings)
+  (relastic/update-mappings native-conn :from-index "relastic_test_v0"
+                                        :to-index "relastic_test_v1"
+                                        :alias "relastic_test"
+                                        :mappings mapping-v1
+                                        :settings settings)
 
   (testing "creates relastic_test_v1 index"
     (is (true? (esi/exists? conn "relastic_test_v1"))))
 
-  (testing "creates relastic_test_read and relastic_test_write aliases"
-    (is (= (eri/get-aliases conn "relastic_test_v1") {:relastic_test_v1 {:aliases {:relastic_test_write {}
-                                                                                   :relastic_test_read {}}}}))))
-(deftest when-old-index-exists-copies-documents-to-new-index
-    (relastic/update-mappings native-conn "relastic_test" 1 mapping-v1 settings)
-    (esd/create conn "relastic_test_write" "tweet" {:content "foo"})
-    (esd/create conn "relastic_test_write" "tweet" {:content "bar"})
-    (relastic/update-mappings native-conn "relastic_test" 2 mapping-v2 settings)
+  (testing "creates alias"
+    (is (= (eri/get-aliases conn "relastic_test_v1") {:relastic_test_v1 {:aliases {:relastic_test {}}}}))))
 
-    (testing "creates relastic_test_v2 index"
+(deftest when-old-index-exists-copies-documents-to-new-index
+    (relastic/update-mappings native-conn :from-index "relastic_test_v0"
+                                          :to-index "relastic_test_v1"
+                                          :alias "relastic_test"
+                                          :mappings mapping-v1 
+                                          :settings settings)
+
+    (esd/create conn "relastic_test_v1" "tweet" {:content "foo"})
+    (esd/create conn "relastic_test_v1" "tweet" {:content "bar"})
+    (relastic/update-mappings native-conn :from-index "relastic_test_v1"
+                                          :to-index "relastic_test_v2"
+                                          :alias "relastic_test"
+                                          :mappings mapping-v2
+                                          :settings settings)
+
+    (testing "creates the new index"
       (is (true? (esi/exists? conn "relastic_test_v2"))))
 
-    (testing "creates relastic_test_read and relastic_test_write aliases"
-      (is (= (eri/get-aliases conn "relastic_test_v1") {:relastic_test_v1 {:aliases {}}})))
-
-    (testing "creates relastic_test_read and relastic_test_write aliases"
-      (is (= (eri/get-aliases conn "relastic_test_v2") {:relastic_test_v2 {:aliases {:relastic_test_write {}
-                                                                                   :relastic_test_read {}}}})))
+    (testing "moves alias from old index to new index"
+      (is (= (eri/get-aliases conn "relastic_test_v1") {:relastic_test_v1 {:aliases {}}}))
+      (is (= (eri/get-aliases conn "relastic_test_v2") {:relastic_test_v2 {:aliases {:relastic_test {}}}})))
 
     (testing "copies documents to new index"
       (let [old-docs (:hits (:hits (esd/search conn "relastic_test_v1" "tweet" :query (q/match-all))))
-            new-docs (:hits (:hits (esd/search conn "relastic_test_read" "tweet" :query (q/match-all))))
+            new-docs (:hits (:hits (esd/search conn "relastic_test_v2" "tweet" :query (q/match-all))))
             expected-docs (map #(assoc % :_index "relastic_test_v2") old-docs)]
 
         (is (= 2 (count new-docs)))

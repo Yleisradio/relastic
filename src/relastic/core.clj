@@ -7,12 +7,6 @@
             [cheshire.core :as json])
   (:gen-class))
 
-(defn- read-alias [index]
-  (str index "_read"))
-
-(defn- write-alias [index]
-  (str index "_write"))
-
 (defn- start-scroll [conn index-name]
   (esd/search-all-types conn index-name 
                         :query (q/match-all)
@@ -26,52 +20,43 @@
              :_id _id}}
    _source])
 
-(defn- copy-documents [conn old-index new-index]
-  (let [bulk-ops (->> (esd/scroll-seq conn (start-scroll conn old-index))
-                      (map #(document->bulk-index-op new-index %))
+(defn- copy-documents [conn from-index to-index]
+  (let [bulk-ops (->> (esd/scroll-seq conn (start-scroll conn from-index))
+                      (map #(document->bulk-index-op to-index %))
                       (flatten))]
     (when-not (empty? bulk-ops)
       (esb/bulk conn bulk-ops))))
 
-(defn- writes->new-index [conn index old-index new-index]
-  (esi/update-aliases conn [{:add  {:index new-index :alias (write-alias index)}}
-                            {:remove {:index old-index :aliases (write-alias index)}}]))
-
-(defn- reads->new-index [conn index old-index new-index]
-  (esi/update-aliases conn [{:add    {:index new-index :alias   (read-alias index)}}
-                            {:remove {:index old-index :aliases (read-alias index)}}]))
-
-(defn- get-refresh-interval [conn index-name]
-  (get-in (esi/get-settings conn index-name)
-          [(keyword index-name) :settings :index :refresh_interval]
+(defn- get-refresh-interval [conn index]
+  (get-in (esi/get-settings conn index)
+          [(keyword index) :settings :index :refresh_interval]
           "1s"))
 
-(defn- set-refresh-interval [conn index-name refresh-interval]
-  (esi/update-settings conn index-name {:index {:refresh_interval refresh-interval}}))
+(defn- set-refresh-interval [conn index refresh-interval]
+  (esi/update-settings conn index {:index {:refresh_interval refresh-interval}}))
 
-(defn- migrate [conn index old-index new-index]
-  (let [refresh-interval (get-refresh-interval conn new-index)]
-    (set-refresh-interval conn new-index -1) ; disable refresh interval during migration 
-    (writes->new-index conn index old-index new-index) 
-    (esi/refresh conn old-index)
-    (copy-documents conn old-index new-index) 
-    (esi/refresh conn new-index)
-    (set-refresh-interval conn new-index refresh-interval) 
-    (reads->new-index conn index old-index new-index)))
+(defn- alias->new-index [conn alias from-index to-index]
+  (esi/update-aliases conn [{:add {:index to-index :alias alias}}
+                            {:remove {:index from-index :aliases alias}}]))
 
-(defn- writes-and-reads->new-index [conn index new-index]
-  (esi/update-aliases conn [{:add {:index new-index :alias (read-alias index)}}
-                            {:add {:index new-index :alias (write-alias index)}}]))
+(defn- add-alias [conn alias index]
+  (esi/update-aliases conn [{:add {:index index :alias alias}}]))
 
-(defn update-mappings [conn index version mappings settings]
-  (let [new-index (str index "_v" version)
-        old-index (str index "_v" (dec version))]
-    (when-not (esi/exists? conn new-index)
-      (println "Index not found, creating...")
-      (esi/create conn new-index :mappings mappings :settings settings)
-      (if (esi/exists? conn old-index)
-        (migrate conn index old-index new-index)
-        (writes-and-reads->new-index conn index new-index)))))
+(defn- migrate [conn from-index to-index alias]
+  (let [refresh-interval (get-refresh-interval conn to-index)]
+    (set-refresh-interval conn to-index -1) ; disable refresh interval during migration 
+    (esi/refresh conn from-index)
+    (copy-documents conn from-index to-index) 
+    (esi/refresh conn to-index)
+    (set-refresh-interval conn to-index refresh-interval) 
+    (alias->new-index conn alias from-index to-index)))
+
+(defn update-mappings [conn & {:keys [from-index to-index alias mappings settings]}]
+  (when-not (esi/exists? conn to-index)
+    (esi/create conn to-index :mappings mappings :settings settings)
+    (if (esi/exists? conn from-index)
+      (migrate conn from-index to-index alias)
+      (add-alias conn alias to-index))))
 
 (defn- throw-validation-error [message]
   (throw (ex-info message {:type :validation-error})))
