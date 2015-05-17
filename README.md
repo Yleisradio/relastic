@@ -26,6 +26,10 @@ You can omit `--from-index`, `--alias`, `--mappings` and `--settings`.
 
 `--host` and `--port` default to `localhost` and `9300` (tranport client is used, not HTTP)
 
+**NOTE**: After reindexing has started, any new documents written to `from-index` won't be copied
+to the new index. To make sure all documents are copied, use `to-index` as the index with all
+ElasticSearch write operations.
+
 ### Clojure usage
 
     (require '[relastic.core :as relastic])
