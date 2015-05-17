@@ -4,7 +4,8 @@
             [clojurewerkz.elastisch.rest.document :as esd]
             [clojurewerkz.elastisch.rest.index :as esi]
             [clojurewerkz.elastisch.query :as q]
-            [clojure.test :refer :all]))
+            [clojure.test :refer :all]
+            [environ.core :refer [env]]))
 
 (use-fixtures :each with-clean-slate)
 
@@ -13,8 +14,8 @@
                    "--alias" "twitter"
                    "--mappings" "test/relastic/twitter_mappings.json"
                    "--settings" "test/relastic/twitter_settings.json"
-                   "--host" "dockerhost"
-                   "--port" "9300"])
+                   "--host" (get env :es-host "dockerhost")
+                   "--port" (get env :es-port "9300")])
 
 (defn- without-param [tbr]
   (reduce (fn [new-params [name value]]
@@ -38,7 +39,9 @@
     (is (true? contains-output?))))
 
 (deftest creates-a-new-index-with-mappings-and-settings-and-and-alias
-  (-main "--to-index" "twitter_v1"
+  (-main "--host" (get env :es-host "dockerhost")
+         "--port" (get env :es-port "9300")
+         "--to-index" "twitter_v1"
          "--mappings" "test/relastic/twitter_mappings.json"
          "--settings" "test/relastic/twitter_settings.json"
          "--alias" "twitter")
@@ -48,11 +51,17 @@
   (is (= (get-in (esi/get-settings conn "twitter_v1") [:twitter_v1 :settings :index :refresh_interval]) "20s")))
 
 (deftest copies-documents-from-old-index-to-new-index
-  (-main "--to-index" "twitter_v1" "--alias" "twitter")
+  (-main "--host" (get env :es-host "dockerhost")
+         "--port" (get env :es-port "9300")
+         "--to-index" "twitter_v1"
+         "--alias" "twitter")
+
   (esd/create conn "twitter_v1" "tweet" {:text "Hello from relastic!" :user "@nylemi"})
   (esd/create conn "twitter_v1" "tweet" {:text "Another tweet" :user "@nylemi"})
 
-  (-main "--from-index" "twitter_v1"
+  (-main "--host" (get env :es-host "dockerhost")
+         "--port" (get env :es-port "9300")
+         "--from-index" "twitter_v1"
          "--to-index" "twitter_v2"
          "--alias" "twitter"
          "--mappings" "test/relastic/twitter_mappings.json")
