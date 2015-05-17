@@ -2,37 +2,46 @@
 
 # relastic
 
-FIXME: description
+Tool for reindexing ElasticSearch documents after mapping changes.
 
-## Installation
+## Usage 
 
-Download from http://example.com/FIXME.
+### Command line usage
 
-## Usage
+    $ java -jar relastic-0.1.0-standalone.jar --host HOST \
+                                              --port PORT \
+                                              --from-index twitter_v1 \
+                                              --to-index twitter_v2 \
+                                              --alias twitter \
+                                              --mappings document-mappings.json \
+                                              --settings document-settings.json
 
-FIXME: explanation
+Executing this will:
 
-    $ java -jar relastic-0.1.0-standalone.jar [args]
+* create a new index `twitter_v2` with mappings and settings from specified files
+* copy all documents from `twitter_v1` to `twitter_v2`
+* adds `twitter` alias to `twitter_v2` and removes it from `twitter_v1` after all documents have been copied
 
-## Options
+You can omit `--from-index`, `--alias`, `--mappings` and `--settings`.
 
-FIXME: listing of options this app accepts.
+`--host` and `--port` default to `localhost` and `9300` (tranport client is used, not HTTP)
 
-## Examples
+### Clojure usage
 
-...
+    (require '[relastic.core :as relastic])
+    (relastic/update-mappings conn :from-index "twitter_v1"
+                                   :to-index "twitter_v2"
+                                   :alias "twitter"
+                                   :mappings {:tweet {:properties {:user {:type "string"
+                                                                          :index "not_analyzed"}}}}
+                                   :settings {:index {:refresh_interval "20s"}})
 
-### Bugs
+`conn` should be a ElasticSearch `TransportClient` (use `clojurewerkz.elastisch.native/connect` to receive one)
 
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
+Otherwise, same options apply as when used from command line.
 
 ## License
 
 Copyright © 2015 Yleisradio Oy
 
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+Distributed under the Eclipse Public License either version 1.0 or (at your option) any later version.
