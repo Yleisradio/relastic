@@ -1,0 +1,10 @@
+{
+    "tweet": {
+        "properties":{
+            "user":{
+                "type":"string",
+                "index":"not_analyzed"
+            }
+        }
+    }
+}

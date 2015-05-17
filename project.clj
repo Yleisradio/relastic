@@ -6,6 +6,6 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [clojurewerkz/elastisch "2.2.0-beta3"]
                  [environ "1.0.0"]]
-  :main ^:skip-aot relastic.core
+  :main ^:skip-aot relastic.main
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
