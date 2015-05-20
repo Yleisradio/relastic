@@ -32,6 +32,12 @@ ElasticSearch write operations.
 
 ### Clojure usage
 
+Include
+
+    [yleisradio/relastic "0.1.0"]
+
+to your `project.clj`. Then:
+
     (require '[relastic.core :as relastic])
     (relastic/update-mappings conn :from-index "twitter_v1"
                                    :to-index "twitter_v2"
