@@ -26,6 +26,7 @@
     "--from-index" [:from-index value]
     "--to-index" [:to-index value]
     "--alias" [:alias value]
+    "--new-alias" [:new-alias value]
     "--mappings" [:mappings (slurp-json-or-error value "Option --mappings expects a file name containing valid json")] 
     "--settings" [:settings (slurp-json-or-error value "Option --settings expects a file name containing valid json")]
     (throw (IllegalArgumentException. (str "Invalid option '" name "'")))))
@@ -45,7 +46,8 @@
   (println "Supported options:")
   (println "--from-index  OPTIONAL Index to migrate from")
   (println "--to-index    REQUIRED Index to migrate to")
-  (println "--alias       OPTIONAL Alias for index")
+  (println "--alias       OPTIONAL Alias given to to-index after all documents have been copied")
+  (println "--new-alias   OPTIONAL Alias given to to-index immediately after it's created")
   (println "--mappings    OPTIONAL File that contains all mappings for the new index as JSON")
   (println "--settings    OPTIONAL File that contains all settings for the new index as JSON")
   (println "--host        OPTIONAL Host to connect (defaults to localhost)")

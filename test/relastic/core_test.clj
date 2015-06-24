@@ -64,3 +64,27 @@
              refresh-interval (get-in actual-settings [:relastic_test_v2 :settings :index :refresh_interval])]
         (is  (= refresh-interval "20s")))))
 
+(deftest adds-new-alias-to-new-index
+  (relastic/update-mappings native-conn :from-index "relastic_test_v0"
+                                        :to-index "relastic_test_v1"
+                                        :alias "relastic_test"
+                                        :new-alias "relastic_test_current"
+                                        :mappings mapping-v1
+                                        :settings settings)
+  
+  (testing "adds new alias to new index"
+    (is (= (eri/get-aliases conn "relastic_test_v1") {:relastic_test_v1 {:aliases {:relastic_test {}
+                                                                                   :relastic_test_current {}}}})))
+  
+  (relastic/update-mappings native-conn :from-index "relastic_test_v1"
+                                        :to-index "relastic_test_v2"
+                                        :alias "relastic_test"
+                                        :new-alias "relastic_test_current"
+                                        :mappings mapping-v2
+                                        :settings settings)
+  
+  (testing "moves new alias to new index"
+    (is (= (eri/get-aliases conn "relastic_test_v1") {:relastic_test_v1 {:aliases {}}}))
+    (is (= (eri/get-aliases conn "relastic_test_v2") {:relastic_test_v2 {:aliases {:relastic_test {}
+                                                                                   :relastic_test_current {}}}}))))
+
