@@ -36,7 +36,7 @@ ElasticSearch write operations.
 
 Include
 
-    [yleisradio/relastic "0.1.0"]
+    [yleisradio/relastic "0.2.0"]
 
 to your `project.clj`. Then:
 
