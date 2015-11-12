@@ -8,7 +8,7 @@ Tool for reindexing ElasticSearch documents after mapping changes.
 
 ### Command line usage
 
-    $ java -jar relastic-0.1.0-standalone.jar --host HOST \
+    $ java -jar relastic-0.2.2-standalone.jar --host HOST \
                                               --port PORT \
                                               --from-index twitter_v1 \
                                               --to-index twitter_v2 \
@@ -36,7 +36,7 @@ ElasticSearch write operations.
 
 Include
 
-    [yleisradio/relastic "0.2.0"]
+    [yleisradio/relastic "0.2.2"]
 
 to your `project.clj`. Then:
 
