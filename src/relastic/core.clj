@@ -21,10 +21,10 @@
 
 (defn- copy-documents [conn from-index to-index]
   (let [bulk-ops (->> (esd/scroll-seq conn (start-scroll conn from-index))
-                      (map #(document->bulk-index-op to-index %))
-                      (flatten))]
-    (when-not (empty? bulk-ops)
-      (esb/bulk conn bulk-ops))))
+                      (mapcat #(document->bulk-index-op to-index %))
+                      (partition-all 500))]
+    (doseq [operations bulk-ops]
+      (esb/bulk conn operations))))
 
 (defn- get-refresh-interval [conn index]
   (get-in (esi/get-settings conn index)
