@@ -4,6 +4,7 @@
             [clojurewerkz.elastisch.native.bulk :as esb]
             [clojurewerkz.elastisch.query :as q]
             [clojurewerkz.elastisch.native :as elastisch]
+            [clojure.tools.logging :refer [info debug]]
             [cheshire.core :as json]))
 
 (defn- start-scroll [conn index-name]
@@ -24,6 +25,7 @@
                       (mapcat #(document->bulk-index-op to-index %))
                       (partition-all 500))]
     (doseq [operations bulk-ops]
+      (info "Migrating batch of" (count operations) "documents from" from-index "to" to-index)
       (esb/bulk conn operations))))
 
 (defn- get-refresh-interval [conn index]
@@ -35,6 +37,7 @@
   (esi/update-settings conn index {:index {:refresh_interval refresh-interval}}))
 
 (defn- migrate-alias [conn alias from-index to-index]
+  (info "Migrating alias:" alias "from index:" from-index "to index:" to-index)
   (let [add-op {:add {:index to-index :alias alias}}
         remove-op {:remove {:index from-index :aliases alias}}]
     (if (and from-index (esi/exists? conn from-index))
@@ -51,10 +54,13 @@
 
 (defn update-mappings [conn & {:keys [from-index to-index alias new-alias mappings settings]}]
   (when-not (esi/exists? conn to-index)
+    (info "Creating index" to-index "with mappings" mappings "and settings" settings)
     (esi/create conn to-index :mappings mappings :settings settings)
-    (when new-alias
+    (info "Index" to-index "created")
+    (when new-alias 
       (migrate-alias conn new-alias from-index to-index))
     (when (and from-index (esi/exists? conn from-index))
+      (info "Migrating documents from" from-index "to" to-index)
       (migrate conn from-index to-index alias new-alias))
     (when alias
       (migrate-alias conn alias from-index to-index))))
