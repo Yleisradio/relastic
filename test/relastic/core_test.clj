@@ -107,3 +107,25 @@
     (is (= 2 (count copied-docs)))
     (is (= {:content "foo" :author "anonymous"} (nth copied-docs 0)))
     (is (= {:content "bar" :author "anonymous"} (nth copied-docs 1)))))
+
+(deftest migrating-parent-child-relationships
+  (let [mappings {:author {:properties {:username {:type "string" :index "not_analyzed"}}}
+                  :tweet {:_parent {:type "author"}}}]
+    (relastic/update-mappings native-conn :from-index "relastic_test_v0"
+                                          :to-index "relastic_test_v1"
+                                          :alias "relastic_test"
+                                          :mappings mappings)
+
+    (esd/create conn "relastic_test_v1" "author" {:username "bob"})
+    (esd/create conn "relastic_test_v1" "tweet" {:content "hello!"} :parent "bob")
+
+    (esi/refresh conn "relastic_test_v1")
+
+    (relastic/update-mappings native-conn :from-index "relastic_test_v1"
+                                          :to-index "relastic_test_v2"
+                                          :alias "relastic_test"
+                                          :mappings mappings)
+
+    (let [docs (:hits (:hits (esd/search conn "relastic_test_v2" "tweet" :fields [:_parent :_source] :query (q/match-all))))]
+      (is (= "bob" (-> docs first :fields :_parent))))))
+

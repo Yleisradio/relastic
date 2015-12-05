@@ -10,15 +10,14 @@
 (defn- start-scroll [conn index-name]
   (esd/search-all-types conn index-name 
                         :query (q/match-all)
+                        :fields ["_parent" "_source"]
                         :search_type "query_then_fetch"
                         :scroll "1m"
                         :size 500))
 
-(defn- document->bulk-index-op [to-index {:keys [_type _id _source]}]
-  [{"index" {:_index to-index
-             :_type _type
-             :_id _id}}
-   _source])
+(defn- document->bulk-index-op [to-index {:keys [_type _id _source _fields]}]
+  (let [meta {:_index to-index :_type _type :_id _id :parent (:_parent _fields)}]
+    [{"index" meta} _source]))
 
 (defn- copy-documents [conn from-index to-index migration-fn]
   (let [bulk-ops (->> (esd/scroll-seq conn (start-scroll conn from-index))
