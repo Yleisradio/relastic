@@ -88,3 +88,22 @@
     (is (= (eri/get-aliases conn "relastic_test_v2") {:relastic_test_v2 {:aliases {:relastic_test {}
                                                                                    :relastic_test_current {}}}}))))
 
+(deftest can-use-migration-fn-to-modify-documents-on-the-fly
+  (relastic/update-mappings native-conn :from-index "relastic_test_v0"
+                                        :to-index "relastic_test_v1"
+                                        :alias "relastic_test"
+                                        :mappings mapping-v1
+                                        :settings settings)
+    (esd/create conn "relastic_test_v1" "tweet" {:content "foo"})
+    (esd/create conn "relastic_test_v1" "tweet" {:content "bar"})
+    (relastic/update-mappings native-conn :from-index "relastic_test_v1"
+                                          :to-index "relastic_test_v2"
+                                          :alias "relastic_test"
+                                          :mappings mapping-v2
+                                          :settings settings
+                                          :migration-fn #(assoc-in % [:_source :author] "anonymous"))
+
+  (let [copied-docs (map :_source (:hits (:hits (esd/search conn "relastic_test_v2" "tweet" :query (q/match-all)))))]
+    (is (= 2 (count copied-docs)))
+    (is (= {:content "foo" :author "anonymous"} (nth copied-docs 0)))
+    (is (= {:content "bar" :author "anonymous"} (nth copied-docs 1)))))

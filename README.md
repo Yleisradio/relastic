@@ -53,6 +53,43 @@ to your `project.clj`. Then:
 
 Otherwise, same options apply as when used from command line.
 
+#### Migrating documents
+
+If you want to modify documents before they are indexed to `:to-index`, you can do so 
+by passing an optional `:migration-fn` function. This is useful in scenarios where you've
+removed a field from your schema and also want it removed from the documents, or when you've
+added a field and want to fill in a default value.
+
+    (defn- migrate-document [{:keys [_type] :as doc}]
+      (if (= _type "tweet")
+        (assoc-in doc [:_source :author] "anonymous")
+        doc))
+
+    (relastic/update-mappings conn :from-index "twitter_v1"
+                                   :to-index "twitter_v2"
+                                   :mappings new-mappings
+                                   :settings new-settings
+                                   :migration-fn migrate-document)
+
+The example above would add `:author "anonymous"` field to all `tweet` documents, but leave other
+document types unmodified.
+
+The `:migration-fn` takes only one argument, the elasticsearch document. The available fields
+are the same that would be available through ElasticSearch's REST API. For migration
+purposes, the most important fields here are:
+
+* `:_type` - original document type
+* `:_source` - original document as map
+
+The return value should be a map with the same fields that were in the original document. Usually
+you'll only want to alter the `:_source` field, but if you want, you can also rename the type to
+something else. This would cause the documents to appear under different type name in the new index.
+
+You should not reconstruct the document map by yourself. Instead, use `assoc-in`, `update-in`
+or something similar to only do the necessary modifications.
+
+At the moment, it's not possible to specify `:migration-fn` from command line.
+
 ## License
 
 Copyright © 2015 Yleisradio Oy

@@ -20,9 +20,9 @@
              :_id _id}}
    _source])
 
-(defn- copy-documents [conn from-index to-index]
+(defn- copy-documents [conn from-index to-index migration-fn]
   (let [bulk-ops (->> (esd/scroll-seq conn (start-scroll conn from-index))
-                      (mapcat #(document->bulk-index-op to-index %))
+                      (mapcat #(document->bulk-index-op to-index (migration-fn %)))
                       (partition-all 500))]
     (doseq [operations bulk-ops]
       (info "Migrating batch of" (count operations) "documents from" from-index "to" to-index)
@@ -44,15 +44,15 @@
       (esi/update-aliases conn [remove-op add-op])
       (esi/update-aliases conn [add-op]))))
 
-(defn- migrate [conn from-index to-index alias new-alias]
+(defn- migrate [conn from-index to-index alias new-alias migration-fn]
   (let [refresh-interval (get-refresh-interval conn to-index)]
     (set-refresh-interval conn to-index -1) ; disable refresh interval during migration 
     (esi/refresh conn from-index)
-    (copy-documents conn from-index to-index)
+    (copy-documents conn from-index to-index migration-fn)
     (esi/refresh conn to-index)
     (set-refresh-interval conn to-index refresh-interval)))
 
-(defn update-mappings [conn & {:keys [from-index to-index alias new-alias mappings settings]}]
+(defn update-mappings [conn & {:keys [from-index to-index alias new-alias mappings settings migration-fn]}]
   (when-not (esi/exists? conn to-index)
     (info "Creating index" to-index "with mappings" mappings "and settings" settings)
     (esi/create conn to-index :mappings mappings :settings settings)
@@ -61,7 +61,7 @@
       (migrate-alias conn new-alias from-index to-index))
     (when (and from-index (esi/exists? conn from-index))
       (info "Migrating documents from" from-index "to" to-index)
-      (migrate conn from-index to-index alias new-alias))
+      (migrate conn from-index to-index alias new-alias (or migration-fn identity)))
     (when alias
       (migrate-alias conn alias from-index to-index))))
 
