@@ -1,4 +1,4 @@
-(defproject yleisradio/relastic "0.2.2"
+(defproject yleisradio/relastic "0.3.0"
   :description "ElasticSearch reindexing library"
   :url "https://github.com/Yleisradio/new-reliquary"
   :license {:name "Eclipse Public License"
