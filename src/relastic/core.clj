@@ -1,9 +1,9 @@
 (ns relastic.core
-  (:require [clojurewerkz.elastisch.native.index :as esi]
-            [clojurewerkz.elastisch.native.document :as esd]
-            [clojurewerkz.elastisch.native.bulk :as esb]
+  (:require [clojurewerkz.elastisch.rest.index :as esi]
+            [clojurewerkz.elastisch.rest.document :as esd]
+            [clojurewerkz.elastisch.rest.bulk :as esb]
             [clojurewerkz.elastisch.query :as q]
-            [clojurewerkz.elastisch.native :as elastisch]
+            [clojurewerkz.elastisch.rest :as elastisch]
             [clojure.tools.logging :refer [info debug]]
             [cheshire.core :as json]))
 

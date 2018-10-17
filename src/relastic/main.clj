@@ -1,5 +1,5 @@
 (ns relastic.main
-  (:require [clojurewerkz.elastisch.native :as elastisch]
+  (:require [clojurewerkz.elastisch.rest :as elastisch]
             [relastic.core :as relastic]
             [cheshire.core :as json])
   (:gen-class))
