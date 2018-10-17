@@ -6,7 +6,7 @@
             [clojurewerkz.elastisch.rest.document :as esd]
             [clojurewerkz.elastisch.query :as q]
             [clojurewerkz.elastisch.rest :as elastisch]
-            [clojurewerkz.elastisch.native :as elastisch-native]
+            [clojurewerkz.elastisch.rest :as elastisch-native]
             [clojurewerkz.elastisch.rest.index :as eri]
             [environ.core :refer [env]]))
 
